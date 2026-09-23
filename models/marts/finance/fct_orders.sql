@@ -1,14 +1,19 @@
 WITH ORDERS AS (
-    SELECT order_id AS ORDERID, customer_id
+    SELECT *
     FROM {{ ref('stg_jaffle_shop__orders') }}
 ),
 PAYMENTS AS (
-    SELECT ORDERID, AMOUNT
-    FROM {{ ref('stg_stripe__payments') }}
+    SELECT * FROM {{ ref('stg_stripe__payments') }}
+),
+ORDER_PAYMENTS AS (
+    SELECT order_id, SUM(CASE WHEN payment_status = 'success' then payment_amount end) as amount
+    FROM PAYMENTS
+    GROUP BY 1
 )
 SELECT
-    ORDERID AS order_id,
-    customer_id,
-    AMOUNT as amount
-FROM PAYMENTS
-LEFT JOIN ORDERS USING (ORDERID)
+    ORDERS.order_id,
+    ORDERS.customer_id,
+    ORDERS.order_date,
+    coalesce(ORDER_PAYMENTS.amount, 0) as amount
+FROM ORDERS
+LEFT JOIN ORDER_PAYMENTS USING (order_id)
